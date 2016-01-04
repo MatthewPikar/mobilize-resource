@@ -21,7 +21,15 @@ var resourceName = 'test',
     expect = chai.expect,
     async = require('async'),
     seneca = require('seneca')()
-        .use('../resourceService', {resourceName: resourceName}),
+        .use('../resourceService', {
+            resourceName: resourceName,
+            resourceFormat: {
+                required$: ['name'],
+                only$: ['id', 'name', 'description', 'image', 'organizers'],
+                name: 'string$',
+                description: 'string$',
+                image: 'string$'
+            }}),
     Promise = require('bluebird'),
     act = Promise.promisify(seneca.act, {context:seneca})
     ;

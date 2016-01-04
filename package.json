@@ -7,7 +7,7 @@
     "email": "matthew.pikar@gmail.com"
   },
   "private": true,
-  "main": "service.js",
+  "main": "resourceService.js",
   "scripts": {
     "test": "mocha test/*.test.js"
   },

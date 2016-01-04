@@ -69,13 +69,7 @@ module.exports = function resourceService(options) {
         resourceName: 'resource',
         resourceBase: '-',
         resourceZone: '-',
-        resourceFormat: {
-            required$: ['name'],
-            only$: ['id', 'name', 'description', 'image', 'organizers'],
-            name: 'string$',
-            description: 'string$',
-            image: 'string$'
-        },
+        resourceFormat: {},
         limit: 10,
         hardLimit: 20,
         sort: {},
