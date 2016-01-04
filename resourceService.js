@@ -66,7 +66,7 @@ module.exports = function resourceService(options) {
     var act = Promise.promisify(seneca.act, {context:seneca});
 
     options = seneca.util.deepextend({
-        resourceName: resource,
+        resourceName: 'resource',
         resourceBase: '-',
         resourceZone: '-',
         resourceFormat: {
@@ -89,22 +89,18 @@ module.exports = function resourceService(options) {
     var response = new Response({context:options.resourceName, debug:!!options.debug});
 
     seneca
-        .add({init: 'options.resourceName'},                   initialize)
-        .add({role: 'options.resourceName', cmd: 'query'},     queryResources)
-        .add({role: 'options.resourceName', cmd: 'get'},       getResource)
-        .add({role: 'options.resourceName', cmd: 'add'},       addResources)
-        .add({role: 'options.resourceName', cmd: 'modify'},    modifyResource)
-        .add({role: 'options.resourceName', cmd: 'delete'},    deleteResource)
+        .add({init: options.resourceName},                   initialize)
+        .add({role: options.resourceName, cmd: 'query'},     queryResources)
+        .add({role: options.resourceName, cmd: 'get'},       getResource)
+        .add({role: options.resourceName, cmd: 'add'},       addResources)
+        .add({role: options.resourceName, cmd: 'modify'},    modifyResource)
+        .add({role: options.resourceName, cmd: 'delete'},    deleteResource)
     ;
 
     function initialize(args, respond){
-        options.resourceName = args.resourceName ? args.resourceName : '-';
-        options.resourceBase = args.resourceBase ? args.resourceBase : '-';
-        options.resourceZone = args.resourceZone ? args.resourceZone : '-';
-        options.namespace = options.resourceZone + '/' + options.resourceBase + '/' + options.resourceName;
-
+        var namespace = options.resourceZone + '/' + options.resourceBase + '/' + options.resourceName;
         var map = {};
-        _.set(map, options.namespace, '*');
+        _.set(map, namespace, '*');
 
         seneca.use('redis-store', {
             options:{},
