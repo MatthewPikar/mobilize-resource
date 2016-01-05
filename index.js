@@ -22,20 +22,20 @@
 // todo: implement custom rules for array/object argument type detection
 // todo: implement custom rule for detection of illegal characters (in fields for example)
 // todo: externalize id generation
-// todo: add seneca.close(); when moving to db
+// todo: add seneca.close() when moving to db
 // todo: figure out why notempty$ and type$ don't work
 
-"use strict";
+"use strict"
 
 /*var customRules = {
     rules:{
         container$: function(ctxt, cb){
-            //var isContainer = ctxt.rule.spec;
-            var val = ctxt.point;
+            //var isContainer = ctxt.rule.spec
+            var val = ctxt.point
 
             if(!(Array.isArray(val) || typeof(val) === 'object'))
-                return ctxt.util.fail(ctxt, cb);
-            return cb();
+                return ctxt.util.fail(ctxt, cb)
+            return cb()
         }},
     msgs:{
         container$: 'The <%=property%> property is not an Array nor an Object.'
@@ -44,26 +44,26 @@
         name: 'container$',
         rules:{type$:'boolean'}
     }
-};*/
+}*/
 
 var _ = require('lodash'),
     Response = require('response'),
     parameterTest = require('parambulator'),
     Promise = require('bluebird'),
     asynch = require('async')
-    ;
+
 
 function generateId(){
-    var len = 16;
+    var len = 16
 
     return _.random(Number.MAX_SAFE_INTEGER)
         .toString(16)
-        .slice(0,len);
+        .slice(0,len)
 }
 
 module.exports = function resourceService(options) {
-    var seneca = this;
-    var act = Promise.promisify(seneca.act, {context:seneca});
+    var seneca = this
+    var act = Promise.promisify(seneca.act, {context:seneca})
 
     options = seneca.util.deepextend({
         resourceName: 'resource',
@@ -78,9 +78,9 @@ module.exports = function resourceService(options) {
         query: "",
         store: {host:'127.0.0.1', port:'6379', user:'', password:''},
         debug: false
-    },options);
+    },options)
 
-    var response = new Response({context:options.resourceName, debug:!!options.debug});
+    var response = new Response({context:options.resourceName, debug:!!options.debug})
 
     seneca
         .add({init: options.resourceName},                   initialize)
@@ -89,12 +89,11 @@ module.exports = function resourceService(options) {
         .add({role: options.resourceName, cmd: 'add'},       addResources)
         .add({role: options.resourceName, cmd: 'modify'},    modifyResource)
         .add({role: options.resourceName, cmd: 'delete'},    deleteResource)
-    ;
 
     function initialize(args, respond){
-        var namespace = options.resourceZone + '/' + options.resourceBase + '/' + options.resourceName;
-        var map = {};
-        _.set(map, namespace, '*');
+        var namespace = options.resourceZone + '/' + options.resourceBase + '/' + options.resourceName
+        var map = {}
+        _.set(map, namespace, '*')
 
         seneca.use('redis-store', {
             options:{},
@@ -102,14 +101,14 @@ module.exports = function resourceService(options) {
                  //options.store.user + ':' + options.store.password +
                  '@' + options.store.host + ':' + options.store.port,
             map: map
-        });
+        })
 
-        return respond();
+        return respond()
     }
 
     function queryResources(args, respond) {
-        var res = {requestId: args.requestId, request:'query'};
-        var startTime = Date.now();
+        var res = {requestId: args.requestId, request:'query'}
+        var startTime = Date.now()
 
         var parameterFormat = parameterTest({
             required$:  ['requestId'],
@@ -117,12 +116,12 @@ module.exports = function resourceService(options) {
             requestId:  'string$',
             fields:     {type$:'array', '*': {type$:'string$', required$:true}}
         }).validate(args, function (err) {
-            if (err) return response.make(400, _.extend(res, {error: {property: err.parambulator.property}}), respond);
+            if (err) return response.make(400, _.extend(res, {error: {property: err.parambulator.property}}), respond)
 
             if( args.requestId === null || args.requestId === "")
-                return response.make(400, res, respond);
+                return response.make(400, res, respond)
 
-            var params = {};
+            var params = {}
 
             // Catch any critical formatting errors that were not caught by the rules.
             try {
@@ -133,7 +132,7 @@ module.exports = function resourceService(options) {
                     skip: (typeof(args.skip) === 'number') ? args.skip : options.skip,
                     fields: (args.fields) ? args.fields : options.fields,
                     sort: options.sort
-                };
+                }
 
                 /*if(
                  typeof(args.sort === 'object') &&
@@ -142,56 +141,56 @@ module.exports = function resourceService(options) {
                  typeof(_.values(args.sort)[0]) === 'boolean'
                  ) {
                  var sortField = ((_.keys(args.sort))[0]),
-                 sortOrder = ((_.values(args.sort))[0] ? 1 : -1);
-                 params.sort = {sortField:sortOrder};
-                 //params.sort = { ((_.keys(args.sort))[0])  :  ((_.values(args.sort))[0] ? 1 : -1) };
+                 sortOrder = ((_.values(args.sort))[0] ? 1 : -1)
+                 params.sort = {sortField:sortOrder}
+                 //params.sort = { ((_.keys(args.sort))[0])  :  ((_.values(args.sort))[0] ? 1 : -1) }
                  }*/
             } catch(err) {
-                return response.make(400, _.extend(res, {error: err}), respond);
+                return response.make(400, _.extend(res, {error: err}), respond)
             }
 
-            res = _.extend({requestId: args.requestId}, params);
+            res = _.extend({requestId: args.requestId}, params)
             if (!(typeof args.query === "undefined"  || args.query === "")) {
                 seneca.make$(options.resourceName).list$(
                     {name: params.query},//,limit$:params.limit,skip$:params.skip,fields$:params.fields,sort$:params.sort},
                     function (err, resources) {
-                        if(err) return response.make(400, _.extend(res, {error: err}), respond);
+                        if(err) return response.make(400, _.extend(res, {error: err}), respond)
                         else if(!resources || resources.length === 0)
                             return response.make(204, _.extend(res, {
                                 latency: Date.now()-startTime
-                            }), respond);
+                            }), respond)
                         else {
                             for(var i = 0, len = resources.length; i<len; i++)
-                                resources[i] = resources[i].data$(false);
+                                resources[i] = resources[i].data$(false)
 
                             return response.make(200, _.extend(res, {
                                 latency: Date.now()-startTime,
                                 resources:resources
-                            }), respond);
+                            }), respond)
                         }
-                });
+                })
             } else {
                 seneca.make$(options.resourceName).list$(
                     //{limit$:params.limit, skip$:params.skip, fields$:params.fields,sort$:params.sort},
                     function (err, resources) {
-                        if(err) return response.make(400, _.extend(res, {error: err}), respond);
+                        if(err) return response.make(400, _.extend(res, {error: err}), respond)
                         else if(!resources || resources.length === 0)
-                            return response.make(204, res, respond);
+                            return response.make(204, res, respond)
                         else {
                             for(var i = 0, len = resources.length; i<len; i++)
-                                resources[i] = resources[i].data$(false);
+                                resources[i] = resources[i].data$(false)
 
                             return response.make(200, _.extend(res, {
                                 latency: Date.now()-startTime,
                                 resources:resources
-                            }), respond);
+                            }), respond)
                         }
-                });
-    }});}
+                })
+    }})}
 
     function getResource(args, respond) {
-        var res = {requestId: args.requestId, request:'get:'+args.id};
-        var startTime = Date.now();
+        var res = {requestId: args.requestId, request:'get:'+args.id}
+        var startTime = Date.now()
         var parameterFormat = parameterTest({
             required$:  ['id', 'requestId'],
             notempty$:  ['id', 'requestId'],
@@ -199,37 +198,37 @@ module.exports = function resourceService(options) {
             requestId:  'string$',
             fields:     'array$'
         }).validate(args, function (err) {
-            if (err) return response.make(400, _.extend(res, {error: {property: err.parambulator.property}}), respond);
+            if (err) return response.make(400, _.extend(res, {error: {property: err.parambulator.property}}), respond)
 
             if( args.id === null || args.id === "" ||
                 args.requestId === null || args.requestId === "")
-                return response.make(400, res, respond);
+                return response.make(400, res, respond)
 
             seneca.make$(options.resourceName).load$({id:args.id, fields$:args.fields}, function(err, resource) {
-                if (err) return response.make(500, _.extend(res, {error: err}), respond);
-                if (!resource) return response.make(404, res, respond);
+                if (err) return response.make(500, _.extend(res, {error: err}), respond)
+                if (!resource) return response.make(404, res, respond)
                 else return response.make(200, _.extend(res, {
                     latency: Date.now()-startTime,
                     resources:resource.data$(false)
-                }), respond);
-            });
-        });
+                }), respond)
+            })
+        })
     }
 
     function addResources(args, respond){
-        var res = {requestId: args.requestId, request:'add'};
-        var startTime = Date.now();
+        var res = {requestId: args.requestId, request:'add'}
+        var startTime = Date.now()
         var parameterFormat = parameterTest({
             required$:  ['requestId', 'resources'],
             notempty$:  ['requestId', 'resources'],
             requestId:  'string$',
             resources:  {type$:'array', '*': options.resourceFormat}
         }).validate(args, function (err) {
-            if (err) return response.make(400, _.extend(res, {error: {property: err.parambulator.property}}), respond);
+            if (err) return response.make(400, _.extend(res, {error: {property: err.parambulator.property}}), respond)
 
-            if (args.resources.length === 0) return response.make(400, _.extend(res, {error: new Error('No resources provided.')}), respond);
+            if (args.resources.length === 0) return response.make(400, _.extend(res, {error: new Error('No resources provided.')}), respond)
             if( args.requestId === null || args.requestId === "")
-                return response.make(400, _.extend(res, {error: new Error('No requestId provided.')}), respond);
+                return response.make(400, _.extend(res, {error: new Error('No requestId provided.')}), respond)
 
             // check if any of the resources already exist, fail if any do.
             asynch.some(
@@ -238,17 +237,17 @@ module.exports = function resourceService(options) {
                     seneca.make$(options.resourceName).load$(
                         {name: resource.name},
                         function (err, resources) {
-                            if (err) return callback(false);
-                            else if(!resources || resources.length === 0) return callback(false);
-                            else return callback(true);
-                });},
+                            if (err) return callback(false)
+                            else if(!resources || resources.length === 0) return callback(false)
+                            else return callback(true)
+                })},
                 function(result){
-                    if(result) return response.make(409, res, respond);
+                    if(result) return response.make(409, res, respond)
 
                     // Non of the resources alredy exist, so create them!
                     else {
                         seneca.ready(function (err) {
-                            if (err) return response.make(500, _.extend(res, {error: err}), respond);
+                            if (err) return response.make(500, _.extend(res, {error: err}), respond)
 
                             asynch.map(
                                 args.resources,
@@ -260,34 +259,34 @@ module.exports = function resourceService(options) {
                                         image: resource.image,
                                         organizers: resource.organizers
                                     }).save$(function (err, resource) {
-                                        if (err) return callback(err);
+                                        if (err) return callback(err)
                                         else {
-                                            callback(null, resource.data$(false));
+                                            callback(null, resource.data$(false))
                                         }
-                                    });
+                                    })
                                 },
                                 function(err, results){
-                                    if (err) return response.make(500, _.extend(res, {error: err}), respond);
+                                    if (err) return response.make(500, _.extend(res, {error: err}), respond)
                                     else return response.make(201, _.extend(res, {
                                         latency: Date.now()-startTime,
                                         resources:results
-                                    }), respond);
-    });});}});});}
+                                    }), respond)
+    })})}})})}
 
     function modifyResource(args, respond){
-        var res = {requestId: args.requestId, request:'modify'};
-        var startTime = Date.now();
+        var res = {requestId: args.requestId, request:'modify'}
+        var startTime = Date.now()
         var parameterFormat = parameterTest({
             required$:  ['requestId', 'resources'],
             notempty$:  ['requestId', 'resources'],
             requestId:  'string$',
             resources:  {type$:'array', '*': options.resourceFormat}
         }).validate(args, function (err) {
-            if (err) return response.make(400, _.extend(res, {error: {property: err.parambulator.property}}), respond);
+            if (err) return response.make(400, _.extend(res, {error: {property: err.parambulator.property}}), respond)
 
-            if (args.resources.length === 0) return response.make(400, _.extend(res, {error: new Error('No resources provided.')}), respond);
+            if (args.resources.length === 0) return response.make(400, _.extend(res, {error: new Error('No resources provided.')}), respond)
             if( args.requestId === null || args.requestId === "")
-                return response.make(400, _.extend(res, {error: new Error('No requestId provided.')}), respond);
+                return response.make(400, _.extend(res, {error: new Error('No requestId provided.')}), respond)
 
             // check if all of the resources exist, fail if any do not.
             asynch.some(
@@ -296,67 +295,67 @@ module.exports = function resourceService(options) {
                     seneca.make$(options.resourceName).load$(
                         {id: resource.id, fields$:['id']},
                         function (err, resources) {
-                            if (err) return callback(false);
-                            else if(!resources || resources.length === 0) return callback(true);
-                            else return callback(false);
-                        });
+                            if (err) return callback(false)
+                            else if(!resources || resources.length === 0) return callback(true)
+                            else return callback(false)
+                        })
                 },
                 function(result){
-                    if(result) return response.make(404, res, respond);
+                    if(result) return response.make(404, res, respond)
 
                     // All resources are valid, so modify them!
                     else {
                         seneca.ready(function (err) {
-                            if (err) return response.make(500, _.extend(res, {error: err}), respond);
+                            if (err) return response.make(500, _.extend(res, {error: err}), respond)
 
                             asynch.map(
                                 args.resources,
                                 function (modResource, callback) {
                                     seneca.make$(options.resourceName).load$(modResource.id, function (err, resource) {
-                                        if (err) return callback(err);
+                                        if (err) return callback(err)
                                         else {
-                                            if (modResource.name)        resource.data$({name: modResource.name});
-                                            if (modResource.description) resource.data$({description: modResource.description});
-                                            if (modResource.image)       resource.data$({image: modResource.image});
-                                            if (modResource.organizers)  resource.data$({organizers: modResource.organizers});
+                                            if (modResource.name)        resource.data$({name: modResource.name})
+                                            if (modResource.description) resource.data$({description: modResource.description})
+                                            if (modResource.image)       resource.data$({image: modResource.image})
+                                            if (modResource.organizers)  resource.data$({organizers: modResource.organizers})
 
                                             resource.save$(function (err, resource) {
-                                                if (err) return callback(err);
-                                                else callback(null, resource.data$(false));
-                                            });
-                                    }});
+                                                if (err) return callback(err)
+                                                else callback(null, resource.data$(false))
+                                            })
+                                    }})
                                 },
                                 function (err, results) {
-                                    if (err) return response.make(500, _.extend(res, {error: err}), respond);
+                                    if (err) return response.make(500, _.extend(res, {error: err}), respond)
                                     else return response.make(200, _.extend(res, {
                                         latency: Date.now()-startTime,
                                         resources: results
-                                    }), respond);
-    });});}});});}
+                                    }), respond)
+    })})}})})}
 
     function deleteResource(args, respond){
-        var res = {requestId: args.requestId, request:'delete:'+args.id};
-        var startTime = Date.now();
+        var res = {requestId: args.requestId, request:'delete:'+args.id}
+        var startTime = Date.now()
         var parameterDescription = parameterTest({
             required$:  ['requestId', 'id'],
             notempty$:  ['requestId', 'id'],
             requestId:  'string$',
             id: 'string$'
         }).validate(args, function(err){
-            if (err) return response.make(400, _.extend(res, {error: {property: err.parambulator.property}}), respond);
+            if (err) return response.make(400, _.extend(res, {error: {property: err.parambulator.property}}), respond)
 
             if( args.id === null || args.id === "" ||
                 args.requestId === null || args.requestId === "")
-                return response.make(400, _.extend(res, {error: new Error('No resource id or requestId provided.')}), respond);
+                return response.make(400, _.extend(res, {error: new Error('No resource id or requestId provided.')}), respond)
 
             seneca.make$(options.resourceName)
                 .remove$(args.id, function(err, resource){
-                if(err) return response.make(500, _.extend(res, {error: err}), respond);
-                else if(!resource) return response.make(404, res, respond);
+                if(err) return response.make(500, _.extend(res, {error: err}), respond)
+                else if(!resource) return response.make(404, res, respond)
                 else return response.make(204, _.extend(res, {
                             latency: Date.now()-startTime
-                    }), respond);
-            });
-        });
+                    }), respond)
+            })
+        })
     }
-};
+}

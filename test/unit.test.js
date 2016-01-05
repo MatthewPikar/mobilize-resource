@@ -21,7 +21,7 @@ var resourceName = 'test',
     expect = chai.expect,
     async = require('async'),
     seneca = require('seneca')()
-        .use('../resourceService', {
+        .use('../index.js', {
             resourceName: resourceName,
             resourceFormat: {
                 required$: ['name'],
