@@ -75,7 +75,7 @@ module.exports = function resourceService(options) {
         sort: {},
         skip: 0,
         fields: [],
-        query: "",
+        query: {},//query: "",
         store: {host:'127.0.0.1', port:'6379', user:'', password:''},
         debug: false
     },options)
@@ -121,18 +121,26 @@ module.exports = function resourceService(options) {
             if( args.requestId === null || args.requestId === "")
                 return response.make(400, res, respond)
 
-            var params = {}
+            var params = {}, query = args.query
 
             // Catch any critical formatting errors that were not caught by the rules.
             try {
                 // Load defaults if not provided in call.
                 params = {
-                    query: (typeof(args.query) === 'string') ? args.query.replace(/[^\w\s]/gi, ' ') : options.query,
+                    query: (typeof(query) === 'object') ? query : options.query,
                     limit: (typeof(args.limit) === 'number') ? args.limit > options.hardLimit ? options.hardLimit : args.limit : options.limit,
                     skip: (typeof(args.skip) === 'number') ? args.skip : options.skip,
                     fields: (args.fields) ? args.fields : options.fields,
                     sort: options.sort
                 }
+
+                params.query = _.forOwn(params.query, function (value, key) {
+                    if (typeof(value) === 'string') {
+                        params.query[key] = value.replace(/[^\w\s]/gi, ' ')
+                    } else {
+                        params.query[key] = ''
+                    }
+                })
 
                 /*if(
                  typeof(args.sort === 'object') &&
@@ -150,9 +158,10 @@ module.exports = function resourceService(options) {
             }
 
             res = _.extend({requestId: args.requestId}, params)
-            if (!(typeof args.query === "undefined"  || args.query === "")) {
+            if (_.size(args.query) !== 0) {
                 seneca.make$(options.resourceName).list$(
-                    {name: params.query},//,limit$:params.limit,skip$:params.skip,fields$:params.fields,sort$:params.sort},
+                    //{name: params.query},//,limit$:params.limit,skip$:params.skip,fields$:params.fields,sort$:params.sort},
+                    args.query,
                     function (err, resources) {
                         if(err) return response.make(400, _.extend(res, {error: err}), respond)
                         else if(!resources || resources.length === 0)
@@ -267,10 +276,13 @@ module.exports = function resourceService(options) {
                                 },
                                 function(err, results){
                                     if (err) return response.make(500, _.extend(res, {error: err}), respond)
-                                    else return response.make(201, _.extend(res, {
-                                        latency: Date.now()-startTime,
-                                        resources:results
-                                    }), respond)
+                                    else {
+                                        seneca.close()
+                                        return response.make(201, _.extend(res, {
+                                            latency: Date.now()-startTime,
+                                            resources:results
+                                        }), respond)
+                                    }
     })})}})})}
 
     function modifyResource(args, respond){
@@ -327,10 +339,13 @@ module.exports = function resourceService(options) {
                                 },
                                 function (err, results) {
                                     if (err) return response.make(500, _.extend(res, {error: err}), respond)
-                                    else return response.make(200, _.extend(res, {
-                                        latency: Date.now()-startTime,
-                                        resources: results
-                                    }), respond)
+                                    else {
+                                        seneca.close()
+                                        return response.make(200, _.extend(res, {
+                                            latency: Date.now()-startTime,
+                                            resources: results
+                                        }), respond)
+                                    }
     })})}})})}
 
     function deleteResource(args, respond){
