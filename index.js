@@ -63,6 +63,7 @@ function generateId(){
 
 module.exports = function resourceService(options) {
     var seneca = this
+    seneca.options({errhandler:errorHandler})
     var act = Promise.promisify(seneca.act, {context:seneca})
 
     options = seneca.util.deepextend({
@@ -372,5 +373,9 @@ module.exports = function resourceService(options) {
                     }), respond)
             })
         })
+    }
+
+    function errorHandler(error){
+        response.make(500, {error: error})
     }
 }
