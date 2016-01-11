@@ -22,7 +22,7 @@
 // todo: implement custom rules for array/object argument type detection
 // todo: implement custom rule for detection of illegal characters (in fields for example)
 // todo: externalize id generation
-// todo: add seneca.close() when moving to db
+// todo: add seneca.close() when moving to db   This creates errors.  Figure out why.
 // todo: figure out why notempty$ and type$ don't work
 
 "use strict"
@@ -278,7 +278,6 @@ module.exports = function resourceService(options) {
                                 function(err, results){
                                     if (err) return response.make(500, _.extend(res, {error: err}), respond)
                                     else {
-                                        seneca.close()
                                         return response.make(201, _.extend(res, {
                                             latency: Date.now()-startTime,
                                             resources:results
@@ -341,7 +340,6 @@ module.exports = function resourceService(options) {
                                 function (err, results) {
                                     if (err) return response.make(500, _.extend(res, {error: err}), respond)
                                     else {
-                                        seneca.close()
                                         return response.make(200, _.extend(res, {
                                             latency: Date.now()-startTime,
                                             resources: results
