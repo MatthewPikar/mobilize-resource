@@ -262,17 +262,14 @@ module.exports = function resourceService(options) {
                             asynch.map(
                                 args.resources,
                                 function(resource, callback){
-                                    seneca.make$(options.resourceName, {
-                                        id: generateId(),
-                                        name: resource.name,
-                                        description: resource.description,
-                                        image: resource.image,
-                                        organizers: resource.organizers
-                                    }).save$(function (err, resource) {
-                                        if (err) return callback(err)
-                                        else {
-                                            callback(null, resource.data$(false))
-                                        }
+                                    resource.id = generateId()
+
+                                    seneca.make$(options.resourceName, resource)
+                                        .save$(function (err, resource) {
+                                            if (err) return callback(err)
+                                            else {
+                                                callback(null, resource.data$(false))
+                                            }
                                     })
                                 },
                                 function(err, results){
@@ -326,10 +323,9 @@ module.exports = function resourceService(options) {
                                     seneca.make$(options.resourceName).load$(modResource.id, function (err, resource) {
                                         if (err) return callback(err)
                                         else {
-                                            if (modResource.name)        resource.data$({name: modResource.name})
-                                            if (modResource.description) resource.data$({description: modResource.description})
-                                            if (modResource.image)       resource.data$({image: modResource.image})
-                                            if (modResource.organizers)  resource.data$({organizers: modResource.organizers})
+                                            _.forEach(modResource, function(value, key){
+                                                resource.data$(_.set({},key,value))
+                                            })
 
                                             resource.save$(function (err, resource) {
                                                 if (err) return callback(err)
