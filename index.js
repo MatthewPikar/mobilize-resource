@@ -50,7 +50,8 @@ var _ = require('lodash'),
     Response = require('response'),
     parameterTest = require('parambulator'),
     Promise = require('bluebird'),
-    asynch = require('async')
+    asynch = require('async'),
+    store = require('seneca-redis-store')
 
 
 function generateId(){
@@ -68,8 +69,8 @@ module.exports = function resourceService(options) {
 
     options = seneca.util.deepextend({
         resourceName: 'resource',
-        resourceBase: '-',
-        resourceZone: '-',
+        resourceBase: false,
+        resourceZone: false,
         resourceFormat: {},
         limit: 10,
         hardLimit: 20,
@@ -81,29 +82,29 @@ module.exports = function resourceService(options) {
         debug: false
     },options)
 
-    var response = new Response({context:options.resourceName, debug:!!options.debug})
+    var namespace = options.resourceName
+
+    var response = new Response({context: namespace, debug:!!options.debug})
+    var map = {}
+    _.set(map, namespace, '*')
+
+    seneca.use(store, {
+        options:{},
+        uri: 'redis://' +
+            //options.store.user + ':' + options.store.password +
+        '@' + options.store.host + ':' + options.store.port,
+        map: map
+    })
 
     seneca
-        .add({init: options.resourceName},                   initialize)
-        .add({role: options.resourceName, cmd: 'query'},     queryResources)
-        .add({role: options.resourceName, cmd: 'get'},       getResource)
-        .add({role: options.resourceName, cmd: 'add'},       addResources)
-        .add({role: options.resourceName, cmd: 'modify'},    modifyResource)
-        .add({role: options.resourceName, cmd: 'delete'},    deleteResource)
+        .add({init: namespace},                   initialize)
+        .add({role: namespace, cmd: 'query'},     queryResources)
+        .add({role: namespace, cmd: 'get'},       getResource)
+        .add({role: namespace, cmd: 'add'},       addResources)
+        .add({role: namespace, cmd: 'modify'},    modifyResource)
+        .add({role: namespace, cmd: 'delete'},    deleteResource)
 
     function initialize(args, respond){
-        var namespace = options.resourceZone + '/' + options.resourceBase + '/' + options.resourceName
-        var map = {}
-        _.set(map, namespace, '*')
-
-        seneca.use('redis-store', {
-            options:{},
-            uri: 'redis://' +
-                 //options.store.user + ':' + options.store.password +
-                 '@' + options.store.host + ':' + options.store.port,
-            map: map
-        })
-
         return respond()
     }
 
@@ -160,7 +161,7 @@ module.exports = function resourceService(options) {
 
             res = _.extend({requestId: args.requestId}, params)
             if (_.size(args.query) !== 0) {
-                seneca.make$(options.resourceName).list$(
+                seneca.make$(namespace).list$(
                     //{name: params.query},//,limit$:params.limit,skip$:params.skip,fields$:params.fields,sort$:params.sort},
                     args.query,
                     function (err, resources) {
@@ -180,7 +181,7 @@ module.exports = function resourceService(options) {
                         }
                 })
             } else {
-                seneca.make$(options.resourceName).list$(
+                seneca.make$(namespace).list$(
                     //{limit$:params.limit, skip$:params.skip, fields$:params.fields,sort$:params.sort},
                     function (err, resources) {
                         if(err) return response.make(400, _.extend(res, {error: err}), respond)
@@ -214,7 +215,7 @@ module.exports = function resourceService(options) {
                 args.requestId === null || args.requestId === "")
                 return response.make(400, res, respond)
 
-            seneca.make$(options.resourceName).load$({id:args.id, fields$:args.fields}, function(err, resource) {
+            seneca.make$(namespace).load$({id:args.id, fields$:args.fields}, function(err, resource) {
                 if (err) return response.make(500, _.extend(res, {error: err}), respond)
                 if (!resource) return response.make(404, res, respond)
                 else return response.make(200, _.extend(res, {
@@ -244,7 +245,7 @@ module.exports = function resourceService(options) {
             asynch.some(
                 args.resources,
                 function(resource, callback){
-                    seneca.make$(options.resourceName).load$(
+                    seneca.make$(namespace).load$(
                         {name: resource.name},
                         function (err, resources) {
                             if (err) return callback(false)
@@ -262,14 +263,18 @@ module.exports = function resourceService(options) {
                             asynch.map(
                                 args.resources,
                                 function(resource, callback){
-                                    resource.id = generateId()
-
-                                    seneca.make$(options.resourceName, resource)
-                                        .save$(function (err, resource) {
-                                            if (err) return callback(err)
-                                            else {
-                                                callback(null, resource.data$(false))
-                                            }
+                                    seneca.make$(namespace, {
+                                        //id: generateId(),
+                                        name: resource.name,
+                                        description: resource.description,
+                                        image: resource.image,
+                                        organizers: resource.organizers
+                                    }).save$(function (err, res) {
+                                        if (err) return callback(err)
+                                        else {
+                                            callback(null, res.data$(false))
+                                        }
+                                        seneca.close()
                                     })
                                 },
                                 function(err, results){
@@ -301,7 +306,7 @@ module.exports = function resourceService(options) {
             asynch.some(
                 args.resources,
                 function(resource, callback){
-                    seneca.make$(options.resourceName).load$(
+                    seneca.make$(namespace).load$(
                         {id: resource.id, fields$:['id']},
                         function (err, resources) {
                             if (err) return callback(false)
@@ -320,12 +325,13 @@ module.exports = function resourceService(options) {
                             asynch.map(
                                 args.resources,
                                 function (modResource, callback) {
-                                    seneca.make$(options.resourceName).load$(modResource.id, function (err, resource) {
+                                    seneca.make$(namespace).load$(modResource.id, function (err, resource) {
                                         if (err) return callback(err)
                                         else {
-                                            _.forEach(modResource, function(value, key){
-                                                resource.data$(_.set({},key,value))
-                                            })
+                                            if (modResource.name)        resource.data$({name: modResource.name})
+                                            if (modResource.description) resource.data$({description: modResource.description})
+                                            if (modResource.image)       resource.data$({image: modResource.image})
+                                            if (modResource.organizers)  resource.data$({organizers: modResource.organizers})
 
                                             resource.save$(function (err, resource) {
                                                 if (err) return callback(err)
@@ -358,7 +364,7 @@ module.exports = function resourceService(options) {
                 args.requestId === null || args.requestId === "")
                 return response.make(400, _.extend(res, {error: new Error('No resource id or requestId provided.')}), respond)
 
-            seneca.make$(options.resourceName)
+            seneca.make$(namespace)
                 .remove$(args.id, function(err, resource){
                 if(err) return response.make(500, _.extend(res, {error: err}), respond)
                 else if(!resource) return response.make(404, res, respond)
@@ -370,6 +376,9 @@ module.exports = function resourceService(options) {
     }
 
     function errorHandler(error){
-        response.make(500, {error: error})
+        act({role:'log', cmd:'error', context:namespace, error:error})
+            .catch(function(err){ console.error(JSON.stringify(err))})
+        console.error(error)
+        //response.make(500, {error: error})
     }
 }
