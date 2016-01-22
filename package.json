@@ -16,9 +16,8 @@
     "bluebird": "^3.0.6",
     "lodash": "^3.10.1",
     "parambulator": "^1.5.1",
-    "seneca": "^0.9.2",
-    "seneca-redis-store": "0.0.8",
-    "seneca-redis-transport": "^0.3.0"
+    "seneca": "^1.0.0",
+    "seneca-redis-store": "0.0.8"
   },
   "devDependencies": {
     "chai": "^3.4.1",
