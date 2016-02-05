@@ -215,12 +215,12 @@ module.exports = function resourceService(options) {
                 args.requestId === null || args.requestId === "")
                 return response.make(400, res, respond)
 
-            seneca.make$(namespace).load$({id:args.id, fields$:args.fields}, function(err, resource) {
+            seneca.make$(namespace).load$({id:args.id}, function(err, resource) {
                 if (err) return response.make(500, _.extend(res, {error: err}), respond)
                 if (!resource) return response.make(404, res, respond)
                 else return response.make(200, _.extend(res, {
                     latency: Date.now()-startTime,
-                    resources:resource.data$(false)
+                    resource:resource.data$(false)
                 }), respond)
             })
         })
@@ -263,19 +263,11 @@ module.exports = function resourceService(options) {
                             asynch.map(
                                 args.resources,
                                 function(resource, callback){
-                                    seneca.make$(namespace, {
-                                        //id: generateId(),
-                                        name: resource.name,
-                                        description: resource.description,
-                                        image: resource.image,
-                                        organizers: resource.organizers
-                                    }).save$(function (err, res) {
-                                        if (err) return callback(err)
-                                        else {
-                                            callback(null, res.data$(false))
-                                        }
-                                        seneca.close()
-                                    })
+                                    seneca.make$(namespace, resource)
+                                        .save$(function (err, res) {
+                                            if (err) return callback(err)
+                                            else callback(null, res.data$(false))
+                                        })
                                 },
                                 function(err, results){
                                     if (err) return response.make(500, _.extend(res, {error: err}), respond)
@@ -288,6 +280,45 @@ module.exports = function resourceService(options) {
     })})}})})}
 
     function modifyResource(args, respond){
+        var res = {requestId: args.requestId, request:'modify'}
+        var startTime = Date.now()
+        var parameterFormat = parameterTest({
+            required$:  ['requestId', 'id', 'resource'],
+            notempty$:  ['requestId', 'id', 'resource'],
+            requestId:  'string$',
+            id:         'string$'
+        }).validate(args, function (err) {
+            //if (err) return response.make(400, _.extend(res, {error: {property: err.parambulator.property}}), respond)
+            if (err) {
+                console.error(err)
+                return response.make(400, _.extend(res, {error: err}), respond)
+            }
+
+            if( args.requestId === null || args.requestId === "")
+                return response.make(400, _.extend(res, {error: new Error('No requestId provided.')}), respond)
+
+            // check if the resource exist, fail if it does not.
+            seneca.make$(namespace).load$({id:args.id}, function (err, resource) {
+                if (err || !resource) return response.make(404, res, respond)
+                // Resource is valid, so modify it!
+                else {
+                    seneca.ready(function (err) {
+                        if (err) return response.make(500, _.extend(res, {error: err}), respond)
+
+                        _.forEach(args.resource, function(value, key){
+                            resource.data$(_.set({},key,value))
+                        })
+
+                        resource.save$(function (err, result) {
+                            if (err) return response.make(500, _.extend(res, {error: err}), respond)
+                            else {
+                                return response.make(200, _.extend(res, {
+                                    latency: Date.now()-startTime,
+                                    resource: result
+                                }), respond)
+    }})})}})})}
+
+    function modifyResources(args, respond){
         var res = {requestId: args.requestId, request:'modify'}
         var startTime = Date.now()
         var parameterFormat = parameterTest({
@@ -337,7 +368,7 @@ module.exports = function resourceService(options) {
                                                 if (err) return callback(err)
                                                 else callback(null, resource.data$(false))
                                             })
-                                    }})
+                                        }})
                                 },
                                 function (err, results) {
                                     if (err) return response.make(500, _.extend(res, {error: err}), respond)
@@ -347,7 +378,7 @@ module.exports = function resourceService(options) {
                                             resources: results
                                         }), respond)
                                     }
-    })})}})})}
+                                })})}})})}
 
     function deleteResource(args, respond){
         var res = {requestId: args.requestId, request:'delete:'+args.id}
@@ -376,9 +407,6 @@ module.exports = function resourceService(options) {
     }
 
     function errorHandler(error){
-        act({role:'log', cmd:'error', context:namespace, error:error})
-            .catch(function(err){ console.error(JSON.stringify(err))})
         console.error(error)
-        //response.make(500, {error: error})
     }
 }
