@@ -129,23 +129,25 @@ module.exports = function resourceService(options) {
             try {
                 // Load defaults if not provided in call.
                 params = {
-                    query: (typeof(query) === 'object') ? query : options.query,
                     limit: (typeof(args.limit) === 'number') ? args.limit > options.hardLimit ? options.hardLimit : args.limit : options.limit,
                     skip: (typeof(args.skip) === 'number') ? args.skip : options.skip,
                     fields: (args.fields) ? args.fields : options.fields,
                     sort: options.sort
                 }
 
-                params.query = _.forOwn(params.query, function (value, key) {
-                    if (typeof(value) === 'string') {
-                        params.query[key] = value.replace(/[^\w\s]/gi, ' ')
-                    } else {
-                        params.query[key] = ''
-                    }
-                })
+                if (query) {
+                    query = _.forOwn(query, function (value, key) {
+                        if (typeof(value) === 'string') {
+                            query[key] = value.replace(/[^\w\s-]/gi, ' ')
+                        } else {
+                            query[key] = ''
+                        }
+                    })
+                }
+                _.extend(params, ((typeof(query) === 'object') ? query : options.query))
 
                 /*if(
-                 typeof(args.sort === 'object') &&
+                 typeof(args.sort) === 'object') &&
                  (_.size(args.sort) === 1) &&
                  _.includes(options.resourceFormat.only$, (args.sort)) &&
                  typeof(_.values(args.sort)[0]) === 'boolean'
