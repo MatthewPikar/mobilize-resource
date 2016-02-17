@@ -24,6 +24,9 @@
 // todo: externalize id generation
 // todo: add seneca.close() when moving to db   This creates errors.  Figure out why.
 // todo: figure out why notempty$ and type$ don't work
+// todo: !! make sure modify doesn't allow to change name into one that already exists
+// todo: only movement names should be forced to be unique
+// todo: change uniqueness to id
 
 "use strict"
 
@@ -265,7 +268,12 @@ module.exports = function resourceService(options) {
                             asynch.map(
                                 args.resources,
                                 function(resource, callback){
-                                    seneca.make$(namespace, resource)
+                                    var now = new Date(Date.now())
+                                    var id = resource.name.replace(/[\s]/gi, '-')
+                                        id = id.replace(/[^\w-]/gi, '')
+                                    var res = _.extend({}, resource, {created: now.toUTCString(), id: id})
+
+                                    seneca.make$(namespace, res)
                                         .save$(function (err, res) {
                                             if (err) return callback(err)
                                             else callback(null, res.data$(false))
@@ -307,7 +315,11 @@ module.exports = function resourceService(options) {
                     seneca.ready(function (err) {
                         if (err) return response.make(500, _.extend(res, {error: err}), respond)
 
-                        _.forEach(args.resource, function(value, key){
+                        var now = new Date(Date.now())
+                        var modifiedResource = _.merge({}, args.resource, {modified: now.toUTCString()})
+
+
+                        _.forEach(modifiedResource, function(value, key){
                             resource.data$(_.set({},key,value))
                         })
 
