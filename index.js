@@ -271,7 +271,11 @@ module.exports = function resourceService(options) {
                                     var now = new Date(Date.now())
                                     var id = resource.name.replace(/[\s]/gi, '-')
                                         id = id.replace(/[^\w-]/gi, '')
-                                    var res = _.extend({}, resource, {created: now.toUTCString(), id: id})
+                                    var res = _.extend({}, resource, {
+                                        id: id,
+                                        created: now.toUTCString(),
+                                        modified: now.toUTCString()
+                                    })
 
                                     seneca.make$(namespace, res)
                                         .save$(function (err, res) {
